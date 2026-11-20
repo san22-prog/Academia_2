@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
   Image,
@@ -47,7 +46,7 @@ export default function LoginScreen({
           <Text style={styles.decorSparkle}>✦</Text>
         </View>
 
-        <BrandMark />
+        <BrandMark styles={styles} />
 
         <Text style={styles.authBrand}>academia</Text>
         <Text style={styles.authTagline}>
@@ -75,7 +74,7 @@ export default function LoginScreen({
           <Text style={styles.authSubheading}>
             {authMode === 'login'
               ? 'Your next favourite study essential awaits.'
-              : 'Create an account for your stationery wishlist.'}
+              : 'Create an account for your study essentials.'}
           </Text>
 
           {authMode === 'signup' && (
@@ -140,6 +139,8 @@ export default function LoginScreen({
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
             style={[styles.input, styles.passwordInput]}
           />
 
@@ -159,6 +160,7 @@ export default function LoginScreen({
                 : 'Create my account  ✿'
             }
             onPress={handleAuth}
+            styles={styles}
             style={{ marginTop: 8 }}
           />
 

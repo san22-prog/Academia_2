@@ -5,24 +5,21 @@ import {
   ScrollView,
   TextInput,
   Pressable,
-  Alert,
 } from 'react-native';
+import { validateProfile } from '../src/helpers/auth';
 
 export default function UserProfileScreen({
   C,
   styles,
   user,
-  setUser,
+  updateUser,
   editProfile,
   setEditProfile,
   favourites,
   cartCount,
   Button,
-  BottomNav,
-  navigate,
-  setPassword,
-  setScreen,
-  setAuthMode,
+  onLogout,
+  onAlert,
   notify,
   renderHeader,
 }) {
@@ -68,9 +65,7 @@ export default function UserProfileScreen({
           <TextInput
             editable={editProfile}
             value={user.name}
-            onChangeText={(value) =>
-              setUser((previous) => ({ ...previous, name: value }))
-            }
+            onChangeText={(value) => updateUser({ name: value })}
             style={[
               styles.profileInput,
               !editProfile && styles.profileInputDisabled,
@@ -84,9 +79,7 @@ export default function UserProfileScreen({
           <TextInput
             editable={editProfile}
             value={user.email}
-            onChangeText={(value) =>
-              setUser((previous) => ({ ...previous, email: value }))
-            }
+            onChangeText={(value) => updateUser({ email: value })}
             style={[
               styles.profileInput,
               !editProfile && styles.profileInputDisabled,
@@ -101,11 +94,8 @@ export default function UserProfileScreen({
             <Button
               title="Save my details ✓"
               onPress={() => {
-                if (
-                  !user.name.trim() ||
-                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)
-                ) {
-                  Alert.alert(
+                if (validateProfile(user)) {
+                  onAlert(
                     'Please check your details',
                     'A name and valid email are required.'
                   );
@@ -115,6 +105,7 @@ export default function UserProfileScreen({
                 setEditProfile(false);
                 notify('Profile details saved ♡');
               }}
+              styles={styles}
               style={{ marginTop: 12 }}
             />
           )}
@@ -159,11 +150,8 @@ export default function UserProfileScreen({
         <Button
           title="Log out"
           variant="outline"
-          onPress={() => {
-            setPassword('');
-            setScreen('auth');
-            setAuthMode('login');
-          }}
+          onPress={onLogout}
+          styles={styles}
           style={{ marginTop: 18 }}
           textStyle={{ color: C.deepPink }}
         />
@@ -174,11 +162,6 @@ export default function UserProfileScreen({
         </Text>
       </ScrollView>
 
-      <BottomNav
-        active="profile"
-        onNavigate={navigate}
-        cartCount={cartCount}
-      />
     </>
   );
 }

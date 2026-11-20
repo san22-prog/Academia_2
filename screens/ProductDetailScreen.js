@@ -17,9 +17,6 @@ export default function ProductDetailScreen({
   money,
   Button,
   addToCart,
-  BottomNav,
-  navigate,
-  cartCount,
 }) {
   if (!selectedProduct) {
     return null;
@@ -128,6 +125,7 @@ export default function ProductDetailScreen({
         <Button
           title={`Add to my bag · ${money(selectedProduct.price)}`}
           onPress={() => addToCart(selectedProduct)}
+          styles={styles}
           style={{ marginTop: 22 }}
         />
 
@@ -135,15 +133,11 @@ export default function ProductDetailScreen({
           title="Keep browsing"
           variant="secondary"
           onPress={() => setScreen('home')}
+          styles={styles}
           style={{ marginTop: 10 }}
         />
       </ScrollView>
 
-      <BottomNav
-        active="home"
-        onNavigate={navigate}
-        cartCount={cartCount}
-      />
     </>
   );
 }

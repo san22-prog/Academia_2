@@ -35,7 +35,6 @@ export default function HomeScreen({
   renderHeader,
   BottomNav,
   navigate,
-  cartCount,
 }) {
 
 
@@ -148,6 +147,7 @@ return (
               title={item}
               active={category === item}
               onPress={() => setCategory(item)}
+              styles={styles}
             />
           ))}
         </ScrollView>
@@ -185,6 +185,8 @@ return (
                 onAdd={() => addToCart(product)}
                 favorite={favourites.includes(product.id)}
                 onFavorite={() => toggleFavorite(product.id)}
+                C={C}
+                styles={styles}
               />
             ))}
           </View>
@@ -217,11 +219,6 @@ return (
         </View>
       </ScrollView>
 
-      <BottomNav
-        active="home"
-        onNavigate={navigate}
-        cartCount={cartCount}
-      />
     </>
   </View>
 );

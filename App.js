@@ -1,132 +1,65 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import LoginScreen from './screens/LoginScreen';
+import AuthScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
 import ProductDetailScreen from './screens/ProductDetailScreen';
 import CartScreen from './screens/CartScreen';
 import UserProfileScreen from './screens/UserProfileScreen';
-import { products as PRODUCTS } from './products';
-
-
+import ButtonComponent from './src/components/Button';
+import BrandMark from './src/components/BrandMark';
+import BottomNav from './src/components/BottomNav';
+import FilterSheet from './src/components/FilterSheet';
+import Pill from './src/components/Pill';
+import ProductCard from './src/components/ProductCard';
+import Toast from './src/components/Toast';
+import { products as PRODUCTS, CATEGORIES, filterProducts } from './src/catalog';
+import { findLoginAccount, normalizeEmail, validateSignup } from './src/helpers/auth';
+import { getCartItems, getCartSummary } from './src/helpers/cart';
+import { money } from './src/helpers/formatters';
+import { useAppStore } from './src/store';
+import C from './src/theme';
+import { shellStyles } from './src/styles';
+import styles from './src/screenStyles';
 import {
   Alert,
   Animated,
-  Image,
-  Modal,
   Platform,
   Pressable,
   SafeAreaView,
   StatusBar,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 
-const C = {
-  ink: '#39364B', muted: '#89869B', pink: '#F2A7C6', deepPink: '#D96D9C', blush: '#FFF0F6',
-  lavender: '#EEE9FF', lilac: '#8D82C8', blue: '#E8F4FF', mint: '#E8F7EF', yellow: '#FFF4D8',
-  cream: '#FFFBF8', white: '#FFFFFF', line: '#F0E8ED', green: '#63B99B', red: '#D96F7F',
-};
-
-
-
-const CATEGORIES = [
-  'All Products',
-  'Paper & Planning',
-  'Everyday Essentials',
-  'Art Supplies',
-];
-
-const PRICE_RANGES = ['Any price', 'Under Rs 150', 'Rs 150–250', 'Over Rs 250'];
-
-const money = (n) => `Rs ${Number(n).toFixed(0)}`;
-
-function Button({ title, onPress, variant = 'primary', style, textStyle, disabled = false }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [styles.button, styles[`button_${variant}`], style, pressed && !disabled ? { opacity: 0.84, transform: [{ scale: 0.985 }] } : null, disabled ? { opacity: 0.45 } : null]}
-    >
-      <Text style={[styles.buttonText, styles[`buttonText_${variant}`], textStyle]}>{title}</Text>
-    </Pressable>
-  );
-}
-
-function BrandMark({ small = false }) {
-  return (
-    <View style={[styles.brandMark, small && styles.brandMarkSmall]}>
-      <Text style={[styles.brandMarkText, small && styles.brandMarkTextSmall]}>a.</Text>
-    </View>
-  );
-}
-
-function Pill({ title, active, onPress }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.pill, active && styles.pillActive]}>
-      <Text style={[styles.pillText, active && styles.pillTextActive]}>{title}</Text>
-    </Pressable>
-  );
-}
-
-function ProductCard({ product, onOpen, onAdd, favorite, onFavorite }) {
-  return (
-    <View style={styles.productCard}>
-      <Pressable onPress={onOpen} style={styles.productImageWrap}>
-        <Image source={product.image} style={styles.productImage} resizeMode="contain" />
-        <View style={styles.productLabel}><Text style={styles.productLabelText}>{product.label}</Text></View>
-      </Pressable>
-      <Pressable onPress={onFavorite} style={styles.heartButton} accessibilityLabel={favorite ? 'Remove from favourites' : 'Add to favourites'}>
-        <Text style={[styles.heartText, favorite && { color: C.deepPink }]}>{favorite ? '♥' : '♡'}</Text>
-      </Pressable>
-      <Pressable onPress={onOpen} style={styles.productInfo}>
-        <Text style={styles.productCategory}>{product.category.toUpperCase()}</Text>
-        <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-        <View style={styles.productPriceRow}>
-          <Text style={styles.productPrice}>{money(product.price)}</Text>
-         
-        </View>
-      </Pressable>
-      <Pressable onPress={onAdd} style={styles.addMini} accessibilityLabel={`Add ${product.name} to cart`}>
-        <Text style={styles.addMiniText}>+</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function BottomNav({ active, onNavigate, cartCount }) {
-  const tabs = [
-    { key: 'home', icon: '⌂', label: 'Home' },
-    { key: 'cart', icon: '♡', label: 'My bag' },
-    { key: 'profile', icon: '☺', label: 'Profile' },
-  ];
-  return (
-    <View style={styles.bottomNav}>
-      {tabs.map((tab) => (
-        <Pressable key={tab.key} onPress={() => onNavigate(tab.key)} style={styles.navItem}>
-          <View style={[styles.navIconWrap, active === tab.key && styles.navIconWrapActive]}>
-            <Text style={[styles.navIcon, active === tab.key && styles.navIconActive]}>{tab.icon}</Text>
-            {tab.key === 'cart' && cartCount > 0 ? <View style={styles.navBadge}>
-              <Text style={styles.navBadgeText}>{cartCount}</Text></View> : null}
-          </View>
-          <Text style={[styles.navLabel, active === tab.key && styles.navLabelActive]}>{tab.label}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
+const Button = (props) => <ButtonComponent {...props} styles={styles} />;
 
 export default function App() {
-  const [screen, setScreen] = useState('auth');
+  const screen = useAppStore((state) => state.screen);
+  const user = useAppStore((state) => state.user);
+  const search = useAppStore((state) => state.search);
+  const category = useAppStore((state) => state.category);
+  const priceRange = useAppStore((state) => state.priceRange);
+  const selectedProduct = useAppStore((state) => state.selectedProduct);
+  const cart = useAppStore((state) => state.cart);
+  const favourites = useAppStore((state) => state.favourites);
+  const editProfile = useAppStore((state) => state.editProfile);
+  const setScreen = useAppStore((state) => state.navigate);
+  const setSearch = useAppStore((state) => state.setSearch);
+  const setCategory = useAppStore((state) => state.setCategory);
+  const setPriceRange = useAppStore((state) => state.setPriceRange);
+  const setSelectedProduct = useAppStore((state) => state.setSelectedProduct);
+  const setEditProfile = useAppStore((state) => state.setEditProfile);
+  const updateUser = useAppStore((state) => state.updateUser);
+  const addToCart = useAppStore((state) => state.addToCart);
+  const changeQuantity = useAppStore((state) => state.changeQuantity);
+  const removeFromCart = useAppStore((state) => state.removeFromCart);
+  const toggleFavorite = useAppStore((state) => state.toggleFavorite);
+  const notify = useAppStore((state) => state.showToast);
+  const enterShop = useAppStore((state) => state.enterShop);
+  const logout = useAppStore((state) => state.logout);
+  const openFilters = useAppStore((state) => state.openFilters);
   const scrollViewRef = useRef(null);
-
-const scrollToProducts = () => {
-  scrollViewRef.current?.scrollTo({
-    y: 700,
-    animated: true,
-  });
-};
+  const scrollToProducts = () => scrollViewRef.current?.scrollTo({ y: 700, animated: true });
   const [authMode, setAuthMode] = useState('login');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -135,21 +68,7 @@ const scrollToProducts = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [accounts, setAccounts] = useState([]);
-  const [user, setUser] = useState(null);
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('All Products');
-  const [priceRange, setPriceRange] = useState('Any price');
-  const [filterDraft, setFilterDraft] = useState({
-  category: 'All Products',
-  priceRange: 'Any price',
-});
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0]);
-  const [cart, setCart] = useState({});
-  const [favourites, setFavourites] = useState([]);
- 
-const [editProfile, setEditProfile] = useState(false);
-const [toast, setToast] = useState('');
+  const activeScreen = user ? screen : 'auth';
 
 useEffect(() => {
   const loadAccounts = async () => {
@@ -157,7 +76,8 @@ useEffect(() => {
       const savedAccounts = await AsyncStorage.getItem('academia_accounts');
 
       if (savedAccounts) {
-        setAccounts(JSON.parse(savedAccounts));
+        const parsedAccounts = JSON.parse(savedAccounts);
+        if (Array.isArray(parsedAccounts)) setAccounts(parsedAccounts);
       }
     } catch (error) {
       console.error('Could not load accounts:', error);
@@ -174,16 +94,14 @@ useEffect(() => {
     return;
   }
 
-  const cleanEmail = email.trim().toLowerCase();
+  const cleanEmail = normalizeEmail(email);
 
   if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
     setEmailError('');
     return;
   }
 
-  const emailExists = accounts.some(
-    (account) => account.email.toLowerCase() === cleanEmail
-  );
+  const emailExists = accounts.some((account) => normalizeEmail(account.email) === cleanEmail);
 
   setEmailError(emailExists ? 'Email unavailable' : 'Email available');
 }, [email, accounts, authMode]);
@@ -191,108 +109,24 @@ useEffect(() => {
 
 
 
-const fade = useRef(new Animated.Value(0)).current;
-
-  const toastTimer = useRef(null);
+const fade = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    fade.setValue(0);
-    Animated.timing(fade, { toValue: 1, duration: 260, useNativeDriver: true }).start();
-  }, [screen, fade]);
+    fade.setValue(0.96);
+    Animated.timing(fade, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [activeScreen, fade]);
 
-  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
-
-
-const cartItems = useMemo(() => {
-  return Object.keys(cart)
-    .map((id) => {
-      const product = PRODUCTS.find(
-        (p) => String(p.id) === String(id)
-      );
-
-      if (!product) return null;
-
-      return {
-        ...product,
-        price: Number(product.price) || 0,
-        quantity: Number(cart[id]) || 0,
-      };
-    })
-    .filter((item) => item && item.quantity > 0);
-}, [cart]);
-
-const cartCount = cartItems.reduce(
-  (sum, item) => sum + item.quantity,
-  0
+const cartItems = useMemo(() => getCartItems(cart, PRODUCTS), [cart]);
+const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+const { subtotal, delivery, total } = getCartSummary(cartItems);
+const filteredProducts = useMemo(
+  () => filterProducts(PRODUCTS, search, category, priceRange),
+  [category, priceRange, search],
 );
-
-const subtotal = cartItems.reduce(
-  (sum, item) => sum + item.price * item.quantity,
-  0
-);
-
-const delivery =
-  subtotal === 0 || subtotal >= 500 ? 0 : 40;
-
-const total = subtotal + delivery;
-
-
-
- 
-const filteredProducts = useMemo(() => {
-  const q = search.trim().toLowerCase();
-
-  return PRODUCTS.filter((p) => {
-   
-    const matchesCategory =
-      q !== '' ||
-      category === 'All Products' ||
-      p.category === category;
-
-    // Search product names and category names
-    const matchesSearch =
-      !q || `${p.name} ${p.category}`.toLowerCase().includes(q);
-
-    let matchesPrice = true;
-
-    if (priceRange === 'Under Rs 150') {
-      matchesPrice = p.price < 150;
-    } else if (priceRange === 'Rs 150–250') {
-      matchesPrice = p.price >= 150 && p.price <= 250;
-    } else if (priceRange === 'Over Rs 250') {
-      matchesPrice = p.price > 250;
-    }
-
-    return matchesCategory && matchesSearch && matchesPrice;
-  });
-}, [category, search, priceRange]);
-
-
-  const notify = (message) => {
-    setToast(message);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(''), 2200);
-  };
-
-  const addToCart = (product) => {
-    setCart((previous) => ({ ...previous, [product.id]: (previous[product.id] || 0) + 1 }));
-    notify(`${product.name} added to your bag ♡`);
-  };
-  const changeQuantity = (id, delta) => {
-    setCart((previous) => {
-      const next = { ...previous };
-      const value = (next[id] || 0) + delta;
-      if (value <= 0) delete next[id]; else next[id] = value;
-      return next;
-    });
-  };
-
-
-
-  const toggleFavorite = (id) => {
-    setFavourites((previous) => previous.includes(id) ? previous.filter((item) => item !== id) : [...previous, id]);
-  };
-  const navigate = (next) => { setEditProfile(false); setScreen(next); };
 
 
   const showAlert = (title, message) => {
@@ -303,354 +137,200 @@ const filteredProducts = useMemo(() => {
     }
   };
 
+  const handleAuth = async () => {
+    if (authMode === 'signup') {
+      const validationError = validateSignup({ name, username, email, password }, accounts);
+      if (validationError) {
+        if (validationError === 'email-taken') {
+          setEmailError('Email unavailable');
+          return;
+        }
 
+        const messages = {
+          required: ['Missing information', 'Please complete every field.'],
+          email: ['Invalid email', 'Please enter a valid email address.'],
+          password: ['Password too short', 'Use at least 6 characters.'],
+        };
+        showAlert(...messages[validationError]);
+        return;
+      }
 
-const handleAuth = async () => {
-  const cleanName = name.trim();
-  const cleanUsername = username.trim();
-  const cleanEmail = email.trim().toLowerCase();
+      const account = {
+        name: name.trim(),
+        username: username.trim(),
+        email: normalizeEmail(email),
+        password,
+      };
 
-  if (authMode === 'signup') {
-    if (!cleanName || !cleanUsername || !cleanEmail || !password) {
-      showAlert('Missing information', 'Please complete every field.');
+      try {
+        const updatedAccounts = [...accounts, account];
+        await AsyncStorage.setItem('academia_accounts', JSON.stringify(updatedAccounts));
+        setAccounts(updatedAccounts);
+        enterShop({ name: account.name, email: account.email });
+        setName('');
+        setUsername('');
+        setEmail('');
+        setPassword('');
+        showAlert('Welcome to Academia!', 'Your account has been created.');
+      } catch (error) {
+        showAlert('Error', 'Could not save your account. Please try again.');
+        console.error('Could not save account:', error);
+      }
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      showAlert('Invalid email', 'Please enter a valid email address.');
+    if (!email.trim() || !password) {
+      showAlert('Missing information', 'Enter your email or username and password.');
       return;
     }
 
-    if (password.length < 6) {
-     showAlert('Password too short', 'Use at least 6 characters.');
+    const account = findLoginAccount(email, password, accounts);
+    if (!account) {
+      showAlert('Login unsuccessful', 'Your login details do not match an account.');
       return;
     }
 
-   const emailExists = accounts.some(
-  (account) => account.email.toLowerCase() === cleanEmail
-  );
-
-   if (emailExists) {
-    setEmailError('Email unavailable');
-    return;
-   }
-
-
-
-    const newAccount = {
-      name: cleanName,
-      username: cleanUsername,
-      email: cleanEmail,
-      password,
-    };
-
-    try {
-      const updatedAccounts = [...accounts, newAccount];
-
-      await AsyncStorage.setItem(
-        'academia_accounts',
-        JSON.stringify(updatedAccounts)
-      );
-
-      setAccounts(updatedAccounts);
-      setUser({
-        name: newAccount.name,
-        email: newAccount.email,
-      });
-
-      setName('');
-      setUsername('');
-      setEmail('');
-      setPassword('');
-      setScreen('home');
-
-      Alert.alert('Welcome to Academia!', 'Your account has been created.');
-    } catch (error) {
-      Alert.alert('Error', 'Could not save your account. Please try again.');
-      console.error(error);
-    }
-
-    return;
-  }
-
-  const identifier = email.trim().toLowerCase();
-
-  if (!identifier || !password) {
-    Alert.alert('Missing information', 'Enter your email or username and password.');
-    return;
-  }
-
-  const matchingAccount = accounts.find((account) => {
-    return (
-      (account.email.toLowerCase() === identifier ||
-        account.username.toLowerCase() === identifier ||
-        account.name.toLowerCase() === identifier) &&
-      account.password === password
-    );
-  });
-
-  if (!matchingAccount) {
-    Alert.alert('Login unsuccessful', 'Your login details do not match an account.');
-    return;
-  }
-
-  setUser({
-    name: matchingAccount.name,
-    email: matchingAccount.email,
-  });
-
-  setName('');
-  setUsername('');
-  setEmail('');
-  setPassword('');
-  setScreen('home');
-};
-
-
-  const openFilters = () => {
-    setFilterDraft({ category, priceRange });
-    setFilterOpen(true);
+    enterShop({ name: account.name, email: account.email });
+    setName('');
+    setUsername('');
+    setEmail('');
+    setPassword('');
   };
-  const applyFilters = () => {
-    setCategory(filterDraft.category); setPriceRange(filterDraft.priceRange); setFilterOpen(false);
-  };
-  const clearFilters = () => setFilterDraft({ category: 'All Products', priceRange: 'Any price' });
-
-  
 
   const renderHeader = (title = 'academia', subtitle = 'little things for big ideas') => (
     <View style={styles.topHeader}>
       <View style={styles.headerLeft}>
-        <BrandMark small />
+        <BrandMark small styles={styles} />
         <View><Text style={styles.headerBrand}>{title}</Text>
         <Text style={styles.headerSubtitle}>{subtitle}</Text>
         </View>
       </View>
-      <Pressable onPress={() => navigate('profile')} style={styles.avatarButton}>
+      <Pressable onPress={() => setScreen('profile')} style={styles.avatarButton}>
         <Text style={styles.avatarButtonText}>{(user.name || 'A').trim().charAt(0).toUpperCase()}</Text>
       </Pressable>
     </View>
   );
 
-
-
-  const renderFilters = () => (
-    <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
-      <View style={styles.modalBackdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setFilterOpen(false)} />
-          <View style={styles.filterSheet}><View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>Find your kind of cute</Text>
-          <Text style={styles.sheetSubtitle}>A few little filters to help</Text>
-          </View>
-          <Pressable onPress={() => setFilterOpen(false)} style={styles.sheetClose}>
-            <Text style={styles.sheetCloseText}>×</Text>
-          </Pressable>
-      </View>
-        <Text style={styles.filterLabel}>CATEGORY</Text>
-        <View style={styles.filterChips}>{CATEGORIES.map((item) => <Pill key={item} title={item} active={filterDraft.category === item} onPress={() => setFilterDraft((p) => ({ ...p, category: item }))} />)}</View>
-    
-        <Text style={styles.filterLabel}>PRICE RANGE</Text>
-        <View style={styles.filterChips}>{PRICE_RANGES.map((item) => <Pill key={item} title={item} active={filterDraft.priceRange === item} onPress={() => setFilterDraft((p) => ({ ...p, priceRange: item }))} />)}</View>
-        <View style={styles.filterActionRow}>
-          <Button title="Reset" variant="secondary" onPress={clearFilters} style={{ flex: 1 }} />
-          <Button title="Show my finds" onPress={applyFilters} style={{ flex: 1 }} /></View>
-       </View>
-      </View>
-    </Modal>
-  );
-
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={shellStyles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={C.cream} />
-      <View style={styles.appBackground}>
-        <Animated.View style={[styles.screenFrame, { opacity: fade }]}>
-          
-
-{screen === 'auth' ? (
-  <LoginScreen
-    C={C}
-    styles={styles}
-    BrandMark={BrandMark}
-    Button={Button}
-    authMode={authMode}
-    setAuthMode={setAuthMode}
-    name={name}
-    setName={setName}
-    username={username}
-    setUsername={setUsername}
-    email={email}
-    setEmail={setEmail}
-    emailError={emailError}
-    setEmailError={setEmailError}
-    password={password}
-    setPassword={setPassword}
-    showPassword={showPassword}
-    setShowPassword={setShowPassword}
-    handleAuth={handleAuth}
-  />
-) : screen === 'home' ? (
-  <HomeScreen
-    C={C}
-    styles={styles}
-    user={user}
-    search={search}
-    setSearch={setSearch}
-    scrollViewRef={scrollViewRef}
-    openFilters={openFilters}
-    category={category}
-    setCategory={setCategory}
-    priceRange={priceRange}
-    setPriceRange={setPriceRange}
-    scrollToProducts={scrollToProducts}
-    CATEGORIES={CATEGORIES}
-    filteredProducts={filteredProducts}
-    ProductCard={ProductCard}
-    Pill={Pill}
-    setSelectedProduct={setSelectedProduct}
-    setScreen={setScreen}
-    addToCart={addToCart}
-    favourites={favourites}
-    toggleFavorite={toggleFavorite}
-    Button={Button}
-    renderHeader={renderHeader}
-    BottomNav={BottomNav}
-    navigate={navigate}
-    cartCount={cartCount}
-  />
-) : screen === 'detail' ? (
-  <ProductDetailScreen
-    C={C}
-    styles={styles}
-    selectedProduct={selectedProduct}
-    setScreen={setScreen}
-    toggleFavorite={toggleFavorite}
-    favourites={favourites}
-    money={money}
-    Button={Button}
-    addToCart={addToCart}
-    BottomNav={BottomNav}
-    navigate={navigate}
-    cartCount={cartCount}
-  />
-) : screen === 'cart' ? (
-  <CartScreen
-    C={C}
-    styles={styles}
-    cartItems={cartItems}
-    cartCount={cartCount}
-    subtotal={subtotal}
-    delivery={delivery}
-    total={total}
-    setScreen={setScreen}
-    setSelectedProduct={setSelectedProduct}
-    changeQuantity={changeQuantity}
-    setCart={setCart}
-    money={money}
-    Button={Button}
-    renderHeader={renderHeader}
-    BottomNav={BottomNav}
-    navigate={navigate}
-  />
-) : (
-  <UserProfileScreen
-    C={C}
-    styles={styles}
-    user={user}
-    setUser={setUser}
-    editProfile={editProfile}
-    setEditProfile={setEditProfile}
-    favourites={favourites}
-    cartCount={cartCount}
-    Button={Button}
-    BottomNav={BottomNav}
-    navigate={navigate}
-    setPassword={setPassword}
-    setScreen={setScreen}
-    setAuthMode={setAuthMode}
-    notify={notify}
-    renderHeader={renderHeader}
-  />
-)}
-
-
-
+      <View style={shellStyles.background}>
+        <Animated.View style={[shellStyles.screenFrame, { opacity: fade }]}>
+          {activeScreen === 'auth' ? (
+            <AuthScreen
+              C={C}
+              styles={styles}
+              BrandMark={BrandMark}
+              Button={Button}
+              authMode={authMode}
+              setAuthMode={setAuthMode}
+              name={name}
+              setName={setName}
+              username={username}
+              setUsername={setUsername}
+              email={email}
+              setEmail={setEmail}
+              emailError={emailError}
+              setEmailError={setEmailError}
+              password={password}
+              setPassword={setPassword}
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
+              handleAuth={handleAuth}
+            />
+          ) : screen === 'home' ? (
+            <HomeScreen
+              C={C}
+              styles={styles}
+              user={user}
+              search={search}
+              setSearch={setSearch}
+              scrollViewRef={scrollViewRef}
+              openFilters={openFilters}
+              category={category}
+              setCategory={setCategory}
+              priceRange={priceRange}
+              setPriceRange={setPriceRange}
+              scrollToProducts={scrollToProducts}
+              CATEGORIES={CATEGORIES}
+              filteredProducts={filteredProducts}
+              ProductCard={ProductCard}
+              Pill={Pill}
+              setSelectedProduct={setSelectedProduct}
+              setScreen={setScreen}
+              addToCart={addToCart}
+              favourites={favourites}
+              toggleFavorite={toggleFavorite}
+              Button={Button}
+              renderHeader={renderHeader}
+            />
+          ) : screen === 'detail' ? (
+            <ProductDetailScreen
+              C={C}
+              styles={styles}
+              selectedProduct={selectedProduct}
+              setScreen={setScreen}
+              toggleFavorite={toggleFavorite}
+              favourites={favourites}
+              money={money}
+              Button={Button}
+              addToCart={addToCart}
+            />
+          ) : screen === 'cart' ? (
+            <CartScreen
+              C={C}
+              styles={styles}
+              cartItems={cartItems}
+              cartCount={cartCount}
+              subtotal={subtotal}
+              delivery={delivery}
+              total={total}
+              setScreen={setScreen}
+              setSelectedProduct={setSelectedProduct}
+              changeQuantity={changeQuantity}
+              removeFromCart={removeFromCart}
+              onCheckout={(amount) => showAlert(
+                'Checkout preview',
+                `Your Academia order total is ${money(amount)}. This prototype does not process real payments.`,
+              )}
+              money={money}
+              Button={Button}
+              renderHeader={renderHeader}
+            />
+          ) : (
+            <UserProfileScreen
+              C={C}
+              styles={styles}
+              user={user}
+              updateUser={updateUser}
+              editProfile={editProfile}
+              setEditProfile={setEditProfile}
+              favourites={favourites}
+              cartCount={cartCount}
+              Button={Button}
+              onLogout={() => {
+                setPassword('');
+                setEmail('');
+                setAuthMode('login');
+                logout();
+              }}
+              onAlert={showAlert}
+              notify={notify}
+              renderHeader={renderHeader}
+            />
+          )}
         </Animated.View>
-        {renderFilters()}
-        {toast && screen !== 'auth' ? 
-        <View pointerEvents="none" style={styles.toast}>
-          <Text style={styles.toastText}>{toast}</Text>
-          </View> : null}
+        {activeScreen !== 'auth' ? (
+          <BottomNav
+            active={activeScreen === 'detail' ? 'home' : activeScreen}
+            onNavigate={setScreen}
+            cartCount={cartCount}
+          />
+        ) : null}
+        <FilterSheet C={C} styles={styles} />
+        <Toast screen={activeScreen} styles={styles} />
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.cream }, 
-  appBackground: { flex: 1, backgroundColor: C.cream }, 
-  screenFrame: { flex: 1 },
-  brandMark: { width: 58, height: 58, borderRadius: 22, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-5deg' }], 
-  shadowColor: '#D96D9C', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
-  brandMarkSmall: { width: 42, height: 42, borderRadius: 15 }, 
-  brandMarkText: { fontSize: 36, fontWeight: '900', color: C.white, lineHeight: 40 }, 
-  brandMarkTextSmall: { fontSize: 26, lineHeight: 31 },
-  button: { minHeight: 52, borderRadius: 17, paddingHorizontal: 18, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  button_primary: { backgroundColor: C.ink, shadowColor: C.ink, shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
-  button_secondary: { backgroundColor: C.blush, borderWidth: 1, borderColor: '#F8D8E6' }, button_outline: { backgroundColor: C.white, borderWidth: 1.5, borderColor: '#F1C1D5' },
-  buttonText: { fontSize: 14, fontWeight: '800', letterSpacing: 0.15 }, buttonText_primary: { color: C.white }, buttonText_secondary: { color: C.deepPink }, buttonText_outline: { color: C.deepPink },
-  authScreen: { flex: 1 }, authScroll: { paddingHorizontal: 26, paddingTop: 28, paddingBottom: 28, alignItems: 'center' },
-  authDecorTop: { width: '100%', height: 42, position: 'relative', marginBottom: 5 }, decorDotPink: { position: 'absolute', width: 25, height: 25, borderRadius: 15, backgroundColor: '#FBD4E4', left: 22, top: 0 }, decorDotBlue: { position: 'absolute', width: 17, height: 17, borderRadius: 10, backgroundColor: '#CDE8FF', right: 42, top: 12 }, decorSparkle: { position: 'absolute', right: 78, top: -3, fontSize: 25, color: C.lilac },
-  authBrand: { fontSize: 33, fontWeight: '900', color: C.ink, marginTop: 11, letterSpacing: -1.1 }, authTagline: { marginTop: 3, color: C.muted, fontSize: 13, letterSpacing: 0.7 },
-  authIllustration: { height: 168, width: 220, marginTop: 9, alignItems: 'center', justifyContent: 'center', position: 'relative' }, authProductArt: { width: 180, height: 168 }, authSticker: { position: 'absolute', bottom: 4, right: -3, backgroundColor: C.yellow, borderRadius: 14, paddingVertical: 7, paddingHorizontal: 12, transform: [{ rotate: '5deg' }] }, authStickerText: { fontSize: 10, color: C.ink, fontWeight: '800' },
-  authCard: { width: '100%', maxWidth: 440, backgroundColor: C.white, borderRadius: 26, padding: 22, borderWidth: 1, borderColor: '#F8E7EF', shadowColor: '#BBA1B2', shadowOpacity: 0.1, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 3 }, authHeading: { fontSize: 24, fontWeight: '900', color: C.ink, letterSpacing: -0.5 }, authSubheading: { color: C.muted, fontSize: 12, lineHeight: 18, marginTop: 6, marginBottom: 18 }, input: { height: 49, borderRadius: 14, backgroundColor: '#FFFAFC', borderColor: C.line, borderWidth: 1, paddingHorizontal: 14, color: C.ink, marginBottom: 10, fontSize: 13 },
-  authSwitch: { alignItems: 'center', marginTop: 18 }, authSwitchText: { fontSize: 12, color: C.muted }, authSwitchStrong: { color: C.deepPink, fontWeight: '900' }, demoNote: { color: '#AAA3AF', fontSize: 10, marginTop: 18 },
-  pageContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28, maxWidth: 760, width: '100%', alignSelf: 'center' }, topHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }, headerLeft: { flexDirection: 'row', gap: 11, alignItems: 'center' }, headerBrand: { fontSize: 20, fontWeight: '900', color: C.ink, letterSpacing: -0.5 }, headerSubtitle: { color: C.muted, fontSize: 10, marginTop: 1 }, avatarButton: { width: 42, height: 42, borderRadius: 15, backgroundColor: C.lavender, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DDD4FF' }, avatarButtonText: { fontSize: 17, fontWeight: '900', color: C.lilac },
-  greetingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 17 }, eyebrow: { color: C.deepPink, fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, greeting: { color: C.ink, fontSize: 28, lineHeight: 35, fontWeight: '900', letterSpacing: -0.9, marginTop: 5 }, greetingSub: { color: C.muted, fontSize: 11, marginTop: 2 }, greetingDoodle: { fontSize: 48, color: C.pink, transform: [{ rotate: '12deg' }], marginRight: 6 },
-  searchRow: { flexDirection: 'row', gap: 10, marginBottom: 20 }, searchBox: { flex: 1, height: 49, borderRadius: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.white, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13 }, searchIcon: { fontSize: 27, color: C.deepPink, marginRight: 8, marginTop: -4 }, searchInput: { flex: 1, paddingVertical: 0, fontSize: 12, color: C.ink }, filterButton: { width: 50, height: 49, borderRadius: 16, backgroundColor: C.lavender, alignItems: 'center', justifyContent: 'center' }, filterIcon: { color: C.lilac, fontSize: 24, fontWeight: '700' },
-  heroCard: { minHeight: 202, backgroundColor: '#FCEAF2', borderRadius: 25, padding: 17, overflow: 'hidden', flexDirection: 'row', marginBottom: 27, position: 'relative', borderWidth: 1, borderColor: '#F8DDE9' }, heroCopy: { width: '59%', zIndex: 2 }, heroTag: { alignSelf: 'flex-start', backgroundColor: C.white, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 }, heroTagText: { fontSize: 8, color: C.deepPink, fontWeight: '900', letterSpacing: 0.7 }, heroTitle: { fontSize: 24, lineHeight: 27, fontWeight: '900', color: C.ink, marginTop: 12, letterSpacing: -0.6 }, heroText: { fontSize: 10, lineHeight: 15, color: '#797183', marginTop: 7, maxWidth: 175 }, heroButton: { alignSelf: 'flex-start', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 11, backgroundColor: C.ink, marginTop: 12 }, heroButtonText: { fontSize: 9, fontWeight: '800', color: C.white }, heroArt: { flex: 1, minWidth: 110, alignItems: 'center', justifyContent: 'center', marginLeft: -8, zIndex: 1 }, heroImage: { height: 176, width: 150, transform: [{ rotate: '7deg' }] }, heroStar: { position: 'absolute', color: C.lilac, fontSize: 27, right: 2, top: 6 }, heroBubble: { position: 'absolute', right: -30, bottom: -55, width: 155, height: 155, borderRadius: 100, backgroundColor: '#F7D5E5' },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }, sectionTitle: { color: C.ink, fontSize: 18, fontWeight: '900', letterSpacing: -0.45 }, sectionSubtitle: { color: C.muted, fontSize: 10, marginTop: 3 }, sectionDoodle: { fontSize: 29, color: C.pink }, categoryList: { gap: 8, paddingBottom: 7, marginBottom: 22 }, pill: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 14, borderWidth: 1, borderColor: C.line, backgroundColor: C.white, marginRight: 0 }, pillActive: { backgroundColor: C.ink, borderColor: C.ink }, pillText: { color: '#777386', fontSize: 10, fontWeight: '700' }, pillTextActive: { color: C.white }, refineText: { color: C.deepPink, fontSize: 11, fontWeight: '900' },
-  productGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 13 }, productCard: { width: '48.2%', borderRadius: 21, borderWidth: 1, borderColor: '#F2E8ED', backgroundColor: C.white, padding: 9, position: 'relative', minHeight: 243 }, productImageWrap: { height: 135, backgroundColor: '#FFF7FB', borderRadius: 15, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, productImage: { width: '100%', height: '100%' }, productLabel: { position: 'absolute', top: 7, left: 7, backgroundColor: C.white, borderRadius: 7, paddingHorizontal: 6, paddingVertical: 4, borderWidth: 1, borderColor: '#F6E7EE' }, productLabelText: { fontSize: 7, color: C.deepPink, fontWeight: '800' }, heartButton: { position: 'absolute', right: 15, top: 13, width: 26, height: 26, borderRadius: 13, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', zIndex: 2 }, heartText: { fontSize: 18, color: '#9E97A9', lineHeight: 21 }, productInfo: { paddingTop: 11, paddingBottom: 6, paddingRight: 3 }, productCategory: { fontSize: 8, fontWeight: '900', letterSpacing: 0.9, color: '#A19AAC' }, productName: { color: C.ink, fontSize: 12, lineHeight: 16, fontWeight: '800', marginTop: 4, minHeight: 31 }, productPriceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }, productPrice: { color: C.ink, fontSize: 12, fontWeight: '900' }, addMini: { position: 'absolute', bottom: 11, right: 10, backgroundColor: C.blush, height: 26, width: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }, addMiniText: { color: C.deepPink, fontSize: 19, lineHeight: 22, fontWeight: '800' }, emptySearch: { padding: 26, backgroundColor: C.white, borderRadius: 22, alignItems: 'center', borderWidth: 1, borderColor: C.line }, emptyEmoji: { fontSize: 36, marginBottom: 10 }, emptyTitle: { fontSize: 17, fontWeight: '900', color: C.ink, textAlign: 'center' }, emptyText: { fontSize: 11, color: C.muted, textAlign: 'center', lineHeight: 18, marginTop: 8, marginBottom: 15 }, footerNote: { marginTop: 24, borderRadius: 15, backgroundColor: '#F4F0FF', padding: 14, flexDirection: 'row', gap: 10, alignItems: 'center' }, footerNoteIcon: { fontSize: 21, color: C.lilac }, footerNoteText: { flex: 1, fontSize: 10, color: '#77708F', fontWeight: '700' },
-  bottomNav: { minHeight: 70, backgroundColor: 'rgba(255,255,255,0.98)', borderTopWidth: 1, borderTopColor: '#F1E7ED', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingBottom: Platform.OS === 'ios' ? 4 : 2, paddingTop: 7 }, navItem: { alignItems: 'center', justifyContent: 'center', width: '33.3%' }, navIconWrap: { width: 37, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', position: 'relative' }, navIconWrapActive: { backgroundColor: C.blush }, navIcon: { fontSize: 21, color: '#A5A0B0', lineHeight: 25 }, navIconActive: { color: C.deepPink }, navLabel: { color: '#A5A0B0', fontSize: 9, marginTop: 2, fontWeight: '700' }, navLabelActive: { color: C.deepPink, fontWeight: '900' }, navBadge: { position: 'absolute', right: -3, top: -3, minWidth: 15, height: 15, borderRadius: 8, backgroundColor: C.deepPink, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.white }, navBadgeText: { color: C.white, fontSize: 8, fontWeight: '900' },
-  detailTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }, backButton: { width: 40, height: 40, borderRadius: 13, backgroundColor: C.white, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' }, backButtonText: { fontSize: 32, color: C.ink, marginTop: -6 }, detailTopTitle: { color: C.ink, fontWeight: '800', fontSize: 13 }, detailHeart: { width: 40, height: 40, borderRadius: 13, backgroundColor: C.blush, alignItems: 'center', justifyContent: 'center' }, detailImagePanel: { height: 290, borderRadius: 26, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }, detailImageOrb: { position: 'absolute', width: 210, height: 210, borderRadius: 110, backgroundColor: 'rgba(255,255,255,0.55)' }, detailImage: { width: '95%', height: '95%', zIndex: 1 }, detailSparkleOne: { position: 'absolute', top: 23, right: 26, color: C.white, fontSize: 28 }, detailSparkleTwo: { position: 'absolute', bottom: 28, left: 27, color: C.white, fontSize: 30 }, detailMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 21, gap: 9 }, detailCategory: { color: C.deepPink, fontSize: 9, fontWeight: '900', letterSpacing: 0.9, flex: 1 }, detailName: { color: C.ink, fontSize: 26, fontWeight: '900', letterSpacing: -0.8, marginTop: 8 }, detailPrice: { color: C.deepPink, fontSize: 20, fontWeight: '900', marginTop: 5 }, detailLabel: { alignSelf: 'flex-start', marginTop: 12, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: C.mint }, detailLabelText: { color: '#468D76', fontSize: 10, fontWeight: '900' }, detailDescription: { fontSize: 12, lineHeight: 20, color: '#787487', marginTop: 14 }, detailFeatureRow: { flexDirection: 'row', gap: 8, marginTop: 20 }, detailFeature: { flex: 1, backgroundColor: C.white, borderWidth: 1, borderColor: C.line, borderRadius: 15, alignItems: 'center', paddingVertical: 13 }, detailFeatureIcon: { color: C.deepPink, fontSize: 19, marginBottom: 6 }, detailFeatureText: { color: '#777386', textAlign: 'center', fontWeight: '700', fontSize: 9, lineHeight: 14 },
-  cartHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }, pageTitle: { color: C.ink, fontSize: 27, fontWeight: '900', letterSpacing: -0.8 }, pageSubtitle: { color: C.muted, fontSize: 11, marginTop: 4 }, cartHeadingHeart: { color: C.pink, fontSize: 42, transform: [{ rotate: '12deg' }] }, emptyCart: { paddingVertical: 42, paddingHorizontal: 22, alignItems: 'center', backgroundColor: C.white, borderRadius: 25, borderWidth: 1, borderColor: C.line, marginTop: 8 }, emptyCartArt: { width: 134, height: 134, borderRadius: 45, backgroundColor: C.blush, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-4deg' }], marginBottom: 23, position: 'relative' }, emptyCartEmoji: { fontSize: 54 }, emptyCartSparkle: { position: 'absolute', color: C.lilac, fontSize: 24, right: 9, top: 7 }, cartList: { gap: 12 }, cartItem: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, backgroundColor: C.white, borderWidth: 1, borderColor: C.line, padding: 10, gap: 10 }, cartThumb: { width: 88, height: 98, borderRadius: 15, overflow: 'hidden' }, cartImage: { width: '100%', height: '100%' }, cartItemInfo: { flex: 1, paddingVertical: 3 }, cartItemName: { color: C.ink, fontSize: 12, fontWeight: '900', marginTop: 4 }, cartItemPrice: { color: C.deepPink, fontWeight: '900', fontSize: 11, marginTop: 5 }, quantityRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 10 }, quantityButton: { width: 25, height: 25, borderRadius: 8, backgroundColor: C.blush, alignItems: 'center', justifyContent: 'center' }, quantityButtonText: { color: C.deepPink, fontSize: 16, fontWeight: '900', lineHeight: 18 }, quantityText: { color: C.ink, fontSize: 11, fontWeight: '900', minWidth: 8, textAlign: 'center' }, removeButton: { marginLeft: 'auto' }, removeButtonText: { color: '#A7A1B0', fontSize: 9, fontWeight: '800' }, cartLineTotal: { color: C.ink, fontSize: 10, fontWeight: '900', alignSelf: 'flex-start', marginTop: 5 }, deliveryNote: { marginTop: 17, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.mint, padding: 14, borderRadius: 17 }, deliveryIcon: { color: C.green, fontSize: 23 }, deliveryTitle: { color: '#3F826C', fontSize: 11, fontWeight: '900' }, deliveryText: { color: '#649886', fontSize: 9, marginTop: 3 }, summaryCard: { backgroundColor: C.white, borderWidth: 1, borderColor: C.line, borderRadius: 22, padding: 18, marginTop: 16 }, summaryHeading: { color: C.ink, fontSize: 15, fontWeight: '900', marginBottom: 16 }, summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 11 }, summaryLabel: { color: C.muted, fontSize: 11 }, summaryValue: { color: C.ink, fontSize: 11, fontWeight: '800' }, summaryDivider: { height: 1, backgroundColor: C.line, marginVertical: 4 }, totalLabel: { color: C.ink, fontSize: 14, fontWeight: '900' }, totalValue: { color: C.deepPink, fontSize: 19, fontWeight: '900' }, checkoutNote: { textAlign: 'center', marginTop: 10, color: '#AAA3AF', fontSize: 9 },
-  profileHero: { backgroundColor: '#FCEAF2', borderRadius: 24, alignItems: 'center', paddingVertical: 25, paddingHorizontal: 18, borderWidth: 1, borderColor: '#F8DDE9' }, profileAvatar: { width: 83, height: 83, borderRadius: 30, backgroundColor: C.white, borderWidth: 4, borderColor: '#F7D4E3', alignItems: 'center', justifyContent: 'center', position: 'relative' }, profileAvatarText: { fontSize: 32, color: C.deepPink, fontWeight: '900' }, profileAvatarFlower: { position: 'absolute', right: -8, bottom: -4, color: C.lilac, fontSize: 22 }, profileName: { fontSize: 22, fontWeight: '900', color: C.ink, marginTop: 13 }, profileEmail: { fontSize: 11, color: C.muted, marginTop: 4 }, memberPill: { backgroundColor: C.white, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 7, marginTop: 13 }, memberPillText: { color: C.deepPink, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 }, profileSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, marginBottom: 12 }, profileCard: { backgroundColor: C.white, borderRadius: 21, borderWidth: 1, borderColor: C.line, padding: 17 }, fieldLabel: { color: '#A19AAC', fontSize: 8, fontWeight: '900', letterSpacing: 1, marginBottom: 6 }, profileInput: { height: 45, borderRadius: 12, borderWidth: 1, borderColor: '#F0E7ED', paddingHorizontal: 12, color: C.ink, fontSize: 12, fontWeight: '700', marginBottom: 14, backgroundColor: '#FFFCFD' }, profileInputDisabled: { backgroundColor: '#FAF8FA', color: '#716D80' }, profileStatsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: C.white, borderRadius: 19, borderWidth: 1, borderColor: C.line, marginTop: 15, paddingVertical: 17 }, profileStat: { flex: 1, alignItems: 'center' }, profileStatNumber: { color: C.deepPink, fontSize: 21, fontWeight: '900' }, profileStatLabel: { color: C.muted, fontSize: 9, marginTop: 4 }, profileStatDivider: { width: 1, height: 35, backgroundColor: C.line }, profileTip: { flexDirection: 'row', gap: 11, backgroundColor: C.lavender, borderRadius: 17, padding: 14, marginTop: 15, alignItems: 'center' }, profileTipIcon: { fontSize: 25, color: C.lilac }, profileTipTitle: { color: '#675D9A', fontSize: 11, fontWeight: '900' }, profileTipText: { color: '#827AA9', fontSize: 10, lineHeight: 15, marginTop: 3 }, profileDisclaimer: { color: '#AAA3AF', fontSize: 9, lineHeight: 14, textAlign: 'center', marginTop: 15 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(50,42,62,0.35)', justifyContent: 'flex-end' }, filterSheet: { backgroundColor: C.cream, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 28, maxHeight: '88%', borderWidth: 1, borderColor: '#F5E3EC' }, sheetHandle: { width: 42, height: 5, borderRadius: 5, backgroundColor: '#E3D8E1', alignSelf: 'center', marginBottom: 19 }, sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }, sheetTitle: { fontSize: 21, color: C.ink, fontWeight: '900', letterSpacing: -0.5 }, sheetSubtitle: { fontSize: 10, color: C.muted, marginTop: 4 }, sheetClose: { width: 34, height: 34, borderRadius: 12, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center' }, sheetCloseText: { color: C.ink, fontSize: 25, lineHeight: 28 }, filterLabel: { color: C.deepPink, fontSize: 9, fontWeight: '900', letterSpacing: 1.2, marginBottom: 9, marginTop: 5 }, filterChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 13 }, filterActionRow: { flexDirection: 'row', gap: 10, marginTop: 6 }, toast: { position: 'absolute', bottom: 83, left: 20, right: 20, alignSelf: 'center', maxWidth: 520, backgroundColor: C.ink, borderRadius: 15, paddingHorizontal: 16, paddingVertical: 12, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 6 }, toastText: { color: C.white, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-
- passwordInput: {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-
-showPasswordButton: {
-  alignSelf: 'flex-end',
-  marginTop: 0,
-  marginBottom: 0,
-  paddingVertical: 2,
-},
-
-showPasswordText: {
-  color: '#9580E8',
-  fontSize: 12,
-  fontWeight: '600',
-},
-
-emailAvailableText: {
-  color: '#48A878',
-  fontSize: 12,
-  textAlign: 'right',
-  marginTop: -8,
-  marginBottom: 8,
-},
-emailErrorText: {
-  color: '#E85D75',
-  fontSize: 12,
-  textAlign: 'right',
-  marginTop: -8,
-  marginBottom: 8,
-},
-
-
-
-});
-
 

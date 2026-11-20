@@ -1,76 +1,69 @@
-# Academia — React Native Stationery Shop
+# Academia Stationery Shop
 
-A cute, pastel-themed mobile application prototype created for the Open University of Mauritius, BSc (Hons) Computer Science Year 2 Semester 2, Mobile Technologies assignment.
+Academia is an Expo React Native stationery-shop demo. It includes a local product catalog and front-end-only account, shopping, and profile flows.
 
-## Included screens
+## Features
 
-1. **Login / Sign-up** — switch between login and account creation, validate the email and password fields, or continue as a guest.
-2. **Home** — search the stationery collection, browse categories, open product details, save favourites, and filter products by category, brand, and price range.
-3. **Product detail** — view a product illustration, category, brand, rating, description and price, then add the product to the bag.
-4. **Cart** — change item quantities, remove items, view subtotal, delivery and total, and open a checkout-preview message.
-5. **User profile** — view and edit the name and email, see simple account stats, and log out.
-
-## Design and interaction
-
-- Academia branding with blush pink, lavender, cream, mint and soft blue.
-- Ten local product illustrations in `assets/products/`; the app does not depend on an external image server.
-- React Native core components and hooks (`View`, `Text`, `Image`, `TextInput`, `ScrollView`, `Pressable`, `Modal`, `Animated`, `useState`, `useEffect`, and `useMemo`).
-- Animated screen fade, pressed-button feedback, add-to-cart toast, favourite toggles, quantity controls and a filter sheet.
-- Currency shown as Mauritian rupees (Rs).
+- Sign up with name, username, valid email, and a password of at least six characters; duplicate email addresses are rejected. Login accepts email, username, or name. An account is required to access the shop.
+- Search products and combine the search with category and price filters.
+- Open product details, toggle favourites, and add products to the cart.
+- Increase/decrease quantities, remove cart items, and view subtotal, delivery, and total. Delivery is Rs 40 below Rs 500 and free from Rs 500.
+- Edit the current profile, log out, and receive toast notifications for cart and profile actions.
+- Browse locally bundled product images; no product image server is required.
 
 ## Requirements
 
-- Node.js LTS (use a version supported by Expo).
-- Visual Studio Code or another code editor.
-- Expo Go on an Android or iOS phone, or an Android emulator.
-- An internet connection for the first dependency installation.
+- Node.js 22.13.x is the supported runtime. `package.json` declares `>=22.13.0 <23`.
+- npm, installed with Node.js.
+- Expo Go for a physical device, or a browser / Android or iOS emulator.
 
-The project uses Expo SDK 57 and React Native 0.86. Expo documents Node.js LTS as a system requirement and describes Expo as a framework for React Native apps: https://docs.expo.dev/get-started/create-a-project/
+## Install and run
 
-## Run the app on Windows
+From the project directory:
 
-1. Download and extract `Academia_React_Native_Source.zip`.
-2. Install Node.js LTS from https://nodejs.org/ and install Visual Studio Code from https://code.visualstudio.com/ if you do not already have them.
-3. Open VS Code, choose **File → Open Folder**, and select the extracted `Academia` folder.
-4. In VS Code, choose **Terminal → New Terminal**.
-5. Run:
+```bash
+npm install
+npm start
+```
 
-   ```bash
-   npm install
-   ```
+Use the Expo terminal menu to open the app on a device or emulator. To run the web version directly:
 
-6. Start Expo:
+```bash
+npm run web
+```
 
-   ```bash
-   npx expo start
-   ```
+## Tests and web export
 
-7. Install **Expo Go** on your Android/iOS phone. Scan the QR code shown in the terminal/browser while your phone and computer are on the same Wi-Fi network.
-8. The app opens on the Login / Sign-up screen. You can type a name, email and password, or choose **Continue as guest** to view the shop immediately.
+```bash
+npm test
+npm exec -- expo export --platform web
+```
 
-If Expo reports that a package version should be adjusted, run `npx expo install --fix`, then run `npx expo start` again.
+Jest uses a Node-only Babel transform for the pure logic tests; Expo/Metro uses `babel-preset-expo` for the application bundle.
 
-## Suggested walkthrough for testing
+## Demo limitations
 
-- Sign in with any valid-looking email (for example, `student@example.com`) and a password of at least four characters. This is a front-end demo, so no account is sent to a server.
-- Search for “notebook”, choose a category chip, and open **Refine** to try category, brand and price filtering.
-- Open a product and tap **Add to my bag**.
-- Open **My bag**, increase/decrease the quantity and remove an item. Compare the subtotal, delivery and total.
-- Open **Profile**, edit the name or email, save, then log out.
-
-## Important scope note
-
-This is a **front-end coursework prototype**. Login, sign-up, profile editing, favourites and cart contents are maintained in app memory only. There is no backend database, real authentication, stock integration or payment gateway. The checkout action is intentionally a preview and does not take payment.
+There is no backend, real authentication, stock service, or payment processing. Demo accounts are saved locally with AsyncStorage for login testing; do not use a real password. Guest/account profile edits, favourites, and cart state are client-side demo data, and signing out clears the current shopping session. Checkout only displays a preview.
 
 ## Project structure
 
 ```text
 Academia/
-├── App.js                       # All five screens and interactive app logic
-├── app.json                     # Expo app configuration
-├── package.json                 # Dependencies and scripts
-├── README.md                    # Setup and testing guide
-├── assets/products/             # Ten locally stored product illustrations
-├── docs/                        # Assignment report and screen preview material
-└── screenshots/                 # Illustrative design previews for the report
+├── App.js                         # App shell, screen routing, auth orchestration
+├── app.json                       # Expo configuration
+├── babel.config.js                # Expo preset with a separate Jest environment
+├── jest.config.js                 # Focused Node logic tests
+├── products.js                    # Local product catalog and image references
+├── screens/                       # Auth, Home, Detail, Cart, and Profile views
+├── src/
+│   ├── catalog.js                  # Catalog exports
+│   ├── theme.js                   # Shared color theme
+│   ├── styles.js                  # Shell and navigation styles
+│   ├── screenStyles.js             # Shared screen styles
+│   ├── components/                # Buttons, product cards, filter, nav, toast
+│   ├── helpers/                   # Auth, cart, catalog filtering, formatting
+│   └── store/                     # Shared Zustand app state
+├── tests/                          # Auth, cart, catalog, and store tests
+├── assets/products/               # Product images bundled with the app
+└── docs/                           # Coursework report files
 ```

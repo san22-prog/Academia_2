@@ -18,7 +18,8 @@ export default function CartScreen({
   setScreen,
   setSelectedProduct,
   changeQuantity,
-  setCart,
+  removeFromCart,
+  onCheckout,
   money,
   Button,
   renderHeader,
@@ -58,6 +59,7 @@ export default function CartScreen({
             <Button
               title="Find my desk besties"
               onPress={() => setScreen('home')}
+              styles={styles}
               style={{ marginTop: 20 }}
             />
           </View>
@@ -112,13 +114,7 @@ export default function CartScreen({
                       </Pressable>
 
                       <Pressable
-                        onPress={() =>
-                          setCart((previous) => {
-                            const next = { ...previous };
-                            delete next[item.id];
-                            return next;
-                          })
-                        }
+                        onPress={() => removeFromCart(item.id)}
                         style={styles.removeButton}
                       >
                         <Text style={styles.removeButtonText}>Remove</Text>
@@ -179,10 +175,9 @@ export default function CartScreen({
               <Button
                 title="Checkout preview  →"
                 onPress={() => {
-                  alert(
-                    `Checkout preview: Your Academia order total is ${money(total)}. This prototype does not process real payments.`
-                  );
+                  onCheckout(total);
                 }}
+                styles={styles}
                 style={{ marginTop: 16 }}
               />
 
@@ -194,11 +189,6 @@ export default function CartScreen({
         )}
       </ScrollView>
 
-      <BottomNav
-        active="cart"
-        onNavigate={navigate}
-        cartCount={cartCount}
-      />
     </View>
   );
 }
